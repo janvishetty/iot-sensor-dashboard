@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IoT Sensor Dashboard</title>
+<script src="https://www.gstatic.com/charts/loader.js"></script>
+<style>
+  :root {
+    --bg: #0f1419; --card: #1a2129; --border: #2a333d;
+    --text: #e6e8eb; --muted: #8b949e; --accent: #58a6ff;
+    --ok: #3fb950; --warn: #d29922; --bad: #f85149;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+         background: var(--bg); color: var(--text); padding: 24px; }
+
+  header { display: flex; justify-content: space-between; align-items: center;
+           flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+  h1 { font-size: 22px; font-weight: 600; }
+  .sub { color: var(--muted); font-size: 13px; margin-top: 4px; }
+
+  .status { display: flex; align-items: center; gap: 8px; font-size: 13px;
+            background: var(--card); border: 1px solid var(--border);
+            padding: 8px 14px; border-radius: 999px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); }
+  .dot.live { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+  .dot.stale { background: var(--warn); }
+  .dot.offline { background: var(--bad); }
+
+  /* ---- node switcher ---- */
+  .switcher { display: inline-flex; background: var(--card); border: 1px solid var(--border);
+              border-radius: 10px; padding: 4px; gap: 4px; margin-bottom: 20px; flex-wrap: wrap; }
+  .switcher button { background: transparent; border: none; color: var(--muted);
+                     font: inherit; font-size: 14px; padding: 8px 16px; border-radius: 7px;
+                     cursor: pointer; transition: background .2s, color .2s; }
+  .switcher button:hover:not(:disabled) { color: var(--text); background: rgba(255,255,255,.05); }
+  .switcher button.active { background: var(--accent); color: #0f1419; font-weight: 600; }
+  .switcher button:disabled { opacity: .4; cursor: not-allowed; }
+
+  .alert-banner { background: rgba(248, 81, 73, .12); border: 1px solid var(--bad);
+                  color: var(--bad); padding: 10px 14px; border-radius: 8px;
+                  font-size: 14px; margin-bottom: 8px; }
+  #alerts { margin-bottom: 16px; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+           gap: 12px; margin-bottom: 24px; }
+  .card { background: var(--card); border: 1px solid var(--border);
+          border-radius: 10px; padding: 14px 16px; transition: border-color .3s; }
+  .card .label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+  .card .value { font-size: 26px; font-weight: 600; margin-top: 6px; }
+  .card .unit { font-size: 13px; color: var(--muted); font-weight: 400; margin-left: 4px; }
+  .card.alert { border-color: var(--bad); }
+  .card.alert .value { color: var(--bad); }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(560px, 1fr)); gap: 16px; }
+  .panel { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+  .panel h2 { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+  .chart { width: 100%; height: 260px; }
+
+  footer { color: var(--muted); font-size: 12px; margin-top: 24px; text-align: center; }
+
+  @media (max-width: 640px) {
+    body { padding: 16px; }
+    .grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>IoT Sensor Dashboard</h1>
+    <div class="sub" id="subtitle">Loading…</div>
+  </div>
+  <div class="status">
+    <span class="dot" id="statusDot"></span>
+    <span id="statusText">Connecting…</span>
+  </div>
+</header>
+
+<nav class="switcher" id="switcher"></nav>
+
+<div id="alerts"></div>
+
+<section class="cards">
+  <div class="card" id="card-temp"><div class="label">Temperature</div>
+    <div class="value"><span class="value-num">–</span><span class="unit">°C</span></div></div>
+  <div class="card" id="card-humidity"><div class="label">Humidity</div>
+    <div class="value"><span class="value-num">–</span><span class="unit">% RH</span></div></div>
+  <div class="card" id="card-co"><div class="label">CO</div>
+    <div class="value"><span class="value-num">–</span></div></div>
+  <div class="card" id="card-smoke"><div class="label">Smoke</div>
+    <div class="value"><span class="value-num">–</span></div></div>
+  <div class="card" id="card-lpg"><div class="label">LPG</div>
+    <div class="value"><span class="value-num">–</span></div></div>
+  <div class="card" id="card-motion"><div class="label">Motion</div>
+    <div class="value"><span class="value-num">–</span></div></div>
+  <div class="card" id="card-light"><div class="label">Light</div>
+    <div class="value"><span class="value-num">–</span></div></div>
+</section>
+
+<section class="grid">
+  <div class="panel"><h2>Temperature (°C)</h2><div class="chart" id="tempChart"></div></div>
+  <div class="panel"><h2>Humidity (% RH)</h2><div class="chart" id="humChart"></div></div>
+  <div class="panel"><h2>Gas readings (CO · Smoke · LPG)</h2><div class="chart" id="gasChart"></div></div>
+  <div class="panel"><h2>Light &amp; Motion</h2><div class="chart" id="binChart"></div></div>
+</section>
+
+<footer>
+  Last entry: <span id="lastEntry">–</span> ·
+  Readings in view: <span id="count">–</span> ·
+  Refreshes every 15 s
+</footer>
+
+<script>
+  // ---------- config ----------
+  // One entry per sensor node. Set id to the ThingSpeak Channel ID, or null if not created yet.
+  const NODES = [
+    { name: "Node 1", id: 3518861, device: "b8:27:eb:bf:9d:51", note: "stable, warm" },
+    { name: "Node 2", id: 3518882, device: "1c:bf:ce:15:ec:4d", note: "variable temp/humidity" },
+    { name: "Node 3", id: 3519225, device: "00:0f:00:70:91:0a", note: "stable, cooler" },
+  ];
+
+  const RESULTS = 60;            // how many recent readings to show
+  const REFRESH_MS = 15000;      // ThingSpeak only gets new data every ~16 s
+  const STALE_AFTER_S = 60;      // no new data for this long = "stale"
+
+  // Demo alert thresholds — tweak these to whatever makes sense
+  const THRESHOLDS = { temp: 30, humidity: 75, co: 0.008, smoke: 0.028, lpg: 0.010 };
+  const LABELS = { temp: "Temperature", humidity: "Humidity", co: "CO", smoke: "Smoke", lpg: "LPG" };
+  const DECIMALS = { temp: 1, humidity: 1, co: 4, smoke: 4, lpg: 4 };
+
+  // ---------- chart styling ----------
+  const MUTED = "#8b949e", TEXT = "#e6e8eb", GRID = "#2a333d";
+  const hAxis = { format: "HH:mm", textStyle: { color: MUTED },
+                  gridlines: { color: "transparent" }, minorGridlines: { color: "transparent" },
+                  baselineColor: GRID };
+  const vAxis = extra => Object.assign(
+    { textStyle: { color: MUTED }, gridlines: { color: GRID },
+      minorGridlines: { color: "transparent" }, baselineColor: GRID }, extra);
+  const common = { backgroundColor: "transparent", lineWidth: 2,
+                   chartArea: { left: 60, right: 15, top: 10, bottom: 40 },
+                   legend: { position: "none" } };
+  const withLegend = { legend: { position: "top", textStyle: { color: TEXT } },
+                       chartArea: { left: 60, right: 15, top: 35, bottom: 40 } };
+
+  // ---------- state ----------
+  let current = 0;               // index into NODES
+  let latestRows = [];
+  const charts = {};
+
+  // ---------- helpers ----------
+  const el = id => document.getElementById(id);
+  const num = v => { const n = parseFloat(v); return Number.isNaN(n) ? null : n; };
+  const chart = (id, Type) => charts[id] || (charts[id] = new Type(el(id)));
+
+  function table(rows, cols) {
+    const dt = new google.visualization.DataTable();
+    dt.addColumn("datetime", "Time");
+    cols.forEach(c => dt.addColumn("number", c.label));
+    dt.addRows(rows.map(r => [r.time, ...cols.map(c => r[c.key])]));
+    return dt;
+  }
+
+  function setStatus(state, text) {
+    el("statusDot").className = "dot " + state;
+    el("statusText").textContent = text;
+  }
+
+  // ---------- node switcher ----------
+  function buildSwitcher() {
+    const nav = el("switcher");
+    NODES.forEach((node, i) => {
+      const btn = document.createElement("button");
+      btn.textContent = node.name;
+      btn.disabled = node.id === null;
+      if (btn.disabled) btn.title = "Channel not set up yet";
+      btn.addEventListener("click", () => selectNode(i));
+      nav.appendChild(btn);
+    });
+  }
+
+  function selectNode(i) {
+    current = i;
+    const node = NODES[i];
+    [...el("switcher").children].forEach((b, j) => b.classList.toggle("active", j === i));
+    el("subtitle").textContent =
+      `${node.name} · device ${node.device} (${node.note}) · real Kaggle telemetry via ThingSpeak`;
+    location.hash = "node" + (i + 1);   // so you can link straight to a node
+
+    // clear the old node's data so nothing stale is shown while loading
+    latestRows = [];
+    document.querySelectorAll(".value-num").forEach(v => v.textContent = "–");
+    document.querySelectorAll(".card").forEach(c => c.classList.remove("alert"));
+    el("alerts").innerHTML = "";
+    Object.values(charts).forEach(c => c.clearChart());
+    setStatus("", "Connecting…");
+    refresh();
+  }
+
+  // ---------- fetch from ThingSpeak ----------
+  async function refresh() {
+    const nodeIndex = current;          // remember which node this request is for
+    const node = NODES[nodeIndex];
+    try {
+      const res = await fetch(
+        `https://api.thingspeak.com/channels/${node.id}/feeds.json?results=${RESULTS}`);
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      if (nodeIndex !== current) return;  // user switched nodes while this was loading
+      if (!data.feeds) throw new Error("channel not public or wrong ID");
+
+      latestRows = data.feeds.map(f => ({
+        time: new Date(f.created_at),       // UTC -> local time automatically
+        temp: num(f.field1), humidity: num(f.field2),
+        co: num(f.field3), smoke: num(f.field4), lpg: num(f.field5),
+        light: num(f.field6), motion: num(f.field7),
+      }));
+
+      updateCards(latestRows);
+      draw(latestRows);
+      updateStatus(latestRows);
+    } catch (err) {
+      if (nodeIndex === current) setStatus("offline", "Offline: " + err.message);
+    }
+  }
+
+  // ---------- status pill ----------
+  function updateStatus(rows) {
+    if (!rows.length) return setStatus("stale", "No data yet");
+    const last = rows[rows.length - 1];
+    const ageS = Math.round((Date.now() - last.time) / 1000);
+    if (ageS > STALE_AFTER_S) setStatus("stale", `No new data for ${ageS}s`);
+    else setStatus("live", "Live");
+    el("lastEntry").textContent = last.time.toLocaleTimeString();
+    el("count").textContent = rows.length;
+  }
+
+  // ---------- current-value cards + alerts ----------
+  function updateCards(rows) {
+    if (!rows.length) return;
+    const last = rows[rows.length - 1];
+    const alerts = [];
+
+    for (const key of ["temp", "humidity", "co", "smoke", "lpg"]) {
+      const v = last[key];
+      const card = el("card-" + key);
+      card.querySelector(".value-num").textContent = v === null ? "–" : v.toFixed(DECIMALS[key]);
+      const over = v !== null && v > THRESHOLDS[key];
+      card.classList.toggle("alert", over);
+      if (over) alerts.push(`${LABELS[key]} above threshold: ${v.toFixed(DECIMALS[key])} > ${THRESHOLDS[key]}`);
+    }
+
+    el("card-motion").querySelector(".value-num").textContent = last.motion ? "Detected" : "None";
+    el("card-light").querySelector(".value-num").textContent = last.light ? "On" : "Off";
+    el("alerts").innerHTML = alerts.map(a => `<div class="alert-banner">⚠ ${a}</div>`).join("");
+  }
+
+  // ---------- charts ----------
+  function draw(rows) {
+    if (!rows.length) return;
+    const G = google.visualization;
+
+    chart("tempChart", G.LineChart).draw(
+      table(rows, [{ key: "temp", label: "Temp (°C)" }]),
+      { ...common, colors: ["#f85149"], hAxis, vAxis: vAxis({ viewWindow: { min: 15, max: 35 } }) });
+
+    chart("humChart", G.LineChart).draw(
+      table(rows, [{ key: "humidity", label: "Humidity (%)" }]),
+      { ...common, colors: ["#58a6ff"], hAxis, vAxis: vAxis({ viewWindow: { min: 0, max: 100 } }) });
+
+    chart("gasChart", G.LineChart).draw(
+      table(rows, [{ key: "co", label: "CO" }, { key: "smoke", label: "Smoke" }, { key: "lpg", label: "LPG" }]),
+      { ...common, ...withLegend, colors: ["#8b949e", "#a5714f", "#ff9f43"],
+        hAxis, vAxis: vAxis({ format: "0.000" }) });
+
+    chart("binChart", G.SteppedAreaChart).draw(
+      table(rows, [{ key: "light", label: "Light" }, { key: "motion", label: "Motion" }]),
+      { ...common, ...withLegend, colors: ["#d29922", "#3fb950"], areaOpacity: 0.25,
+        isStacked: false, connectSteps: true, hAxis,
+        vAxis: vAxis({ viewWindow: { min: -0.1, max: 1.2 }, ticks: [0, 1] }) });
+  }
+
+  // ---------- start ----------
+  google.charts.load("current", { packages: ["corechart"] });
+  google.charts.setOnLoadCallback(() => {
+    buildSwitcher();
+    // open the node from the URL (#node2) if given and set up, otherwise Node 1
+    const fromHash = parseInt((location.hash.match(/node(\d)/) || [])[1], 10) - 1;
+    selectNode(NODES[fromHash] && NODES[fromHash].id !== null ? fromHash : 0);
+    setInterval(refresh, REFRESH_MS);
+    window.addEventListener("resize", () => draw(latestRows));
+  });
+</script>
+</body>
+</html>

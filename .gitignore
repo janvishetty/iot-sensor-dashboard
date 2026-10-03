@@ -1,0 +1,13 @@
+# secrets — never commit API keys
+.env
+
+# python virtual environment and caches
+venv/
+__pycache__/
+*.pyc
+
+# dataset — large, download from Kaggle instead
+*.csv
+
+# macOS
+.DS_Store
