@@ -4,7 +4,7 @@ A cloud IoT pipeline that replays **real environmental sensor telemetry** from t
 
 No physical hardware needed: the "devices" are Python scripts that replay a public Kaggle dataset row by row, the way IoT teams test pipelines before deploying sensors.
 
-![Dashboard – Node 2 with humidity alert](screenshots/node2.jpeg)
+![Dashboard – Node 2 with humidity alert](screenshots/node2.png)
 
 ---
 
@@ -38,7 +38,12 @@ flowchart LR
 - **Real data, not random numbers:** every reading comes from an actual sensor log
 - **Multi-node dashboard:** switch between 3 sensor nodes; linkable views (`#node2`)
 - **Live status indicator:** green *Live*, yellow *stale* (no data for 60 s), red *offline*
-- **Threshold alerts:** cards turn red and a banner appears when a reading crosses its threshold
+- **Two-layer alerting:**
+  - *Fixed limits* (red): the same safety limit for every node, e.g. smoke > 0.028
+  - *Per-node anomaly detection* (amber): each reading is compared to that node's own recent baseline using a z-score; values ≥ 3 standard deviations from normal are flagged, with a minimum spread so normal sensor jitter isn't flagged
+- **Fleet view:** status cards for all nodes at once (live / stale / offline, latest readings, alert badge)
+- **Event log:** timeline of limit breaches, anomalies, and nodes going offline or coming back
+- **Test injection (`spike.py`):** sends one labelled *TEST SPIKE* reading to show the alerting works
 - **Rate-limit aware:** respects ThingSpeak's 15-second free-tier limit and retries rejected sends without skipping data
 - **Fast-forward replay:** `STEP` setting skips rows so ~1 minute of original data is sent per update
 - **Secrets kept out of code:** write keys load from a git-ignored `.env` file
@@ -104,11 +109,23 @@ Open **http://localhost:8000/dashboard.html**.
 
 > Serve the dashboard over HTTP rather than opening it as a `file://` URL. Chrome treats `file:` URLs as unique security origins, which causes cross-frame warnings.
 
+## Demo: anomaly vs. fixed limit
+
+With all nodes running, inject a small gas spike into Node 2:
+
+```bash
+python spike.py 2        # gas readings x1.25: under the fixed limits, but unusual for this node
+python spike.py 2 3      # gas readings x3: a big leak that trips both layers
+```
+
+The first command shows why per-node anomaly detection matters: the fixed thresholds see nothing wrong, but the reading is far outside Node 2's normal range, so it's flagged amber. Injected readings carry the ThingSpeak status `TEST SPIKE` and are labelled `[test injection]` on the dashboard.
+
 ## Project structure
 
 ```
 ├── replay.py          # simulated IoT device: replays one node's data to ThingSpeak
 ├── dashboard.html     # custom real-time dashboard (Google Charts)
+├── spike.py           # injects one labelled test spike to demo the alerting
 ├── requirements.txt   # Python dependencies
 ├── screenshots/       # images used in this README
 ├── .env               # your API keys (git-ignored, not committed)
@@ -123,7 +140,7 @@ Open **http://localhost:8000/dashboard.html**.
 
 ## Possible extensions
 
-- **Anomaly-based alerts:** replace fixed thresholds with per-node statistical baselines (e.g. z-score), the same idea as anomaly-based intrusion detection
+- **Smarter baselines:** time-of-day aware baselines or an ML model (e.g. Isolation Forest) instead of a rolling z-score
 - **Google Sheets logging:** mirror readings to a sheet for long-term storage
 - **Notifications:** ThingSpeak React + ThingHTTP to send an alert when a threshold is crossed
 

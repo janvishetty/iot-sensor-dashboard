@@ -23,24 +23,29 @@
   .status { display: flex; align-items: center; gap: 8px; font-size: 13px;
             background: var(--card); border: 1px solid var(--border);
             padding: 8px 14px; border-radius: 999px; }
-  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); flex: none; }
   .dot.live { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
   .dot.stale { background: var(--warn); }
   .dot.offline { background: var(--bad); }
 
-  /* ---- node switcher ---- */
-  .switcher { display: inline-flex; background: var(--card); border: 1px solid var(--border);
-              border-radius: 10px; padding: 4px; gap: 4px; margin-bottom: 20px; flex-wrap: wrap; }
-  .switcher button { background: transparent; border: none; color: var(--muted);
-                     font: inherit; font-size: 14px; padding: 8px 16px; border-radius: 7px;
-                     cursor: pointer; transition: background .2s, color .2s; }
-  .switcher button:hover:not(:disabled) { color: var(--text); background: rgba(255,255,255,.05); }
-  .switcher button.active { background: var(--accent); color: #0f1419; font-weight: 600; }
-  .switcher button:disabled { opacity: .4; cursor: not-allowed; }
+  /* ---- fleet: one status card per node, click to view it ---- */
+  .fleet { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+           gap: 12px; margin-bottom: 20px; }
+  .node-btn { text-align: left; background: var(--card); border: 1px solid var(--border);
+              border-radius: 10px; padding: 12px 14px; color: var(--text); font: inherit;
+              cursor: pointer; transition: border-color .2s; }
+  .node-btn:hover:not(:disabled) { border-color: var(--muted); }
+  .node-btn.active { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  .node-btn:disabled { opacity: .4; cursor: not-allowed; }
+  .node-btn .top { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; }
+  .node-btn .meta { color: var(--muted); font-size: 13px; margin-top: 6px; }
+  .badge { margin-left: auto; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+  .badge.alert { background: rgba(248, 81, 73, .15); color: var(--bad); }
+  .badge.anomaly { background: rgba(210, 153, 34, .15); color: var(--warn); }
 
-  .alert-banner { background: rgba(248, 81, 73, .12); border: 1px solid var(--bad);
-                  color: var(--bad); padding: 10px 14px; border-radius: 8px;
-                  font-size: 14px; margin-bottom: 8px; }
+  .banner { padding: 10px 14px; border-radius: 8px; font-size: 14px; margin-bottom: 8px; border: 1px solid; }
+  .banner.alert { background: rgba(248, 81, 73, .12); border-color: var(--bad); color: var(--bad); }
+  .banner.anomaly { background: rgba(210, 153, 34, .12); border-color: var(--warn); color: var(--warn); }
   #alerts { margin-bottom: 16px; }
 
   .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -50,13 +55,28 @@
   .card .label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
   .card .value { font-size: 26px; font-weight: 600; margin-top: 6px; }
   .card .unit { font-size: 13px; color: var(--muted); font-weight: 400; margin-left: 4px; }
+  .card .z { font-size: 12px; color: var(--muted); margin-top: 6px; min-height: 1em; }
   .card.alert { border-color: var(--bad); }
   .card.alert .value { color: var(--bad); }
+  .card.anomaly { border-color: var(--warn); }
+  .card.anomaly .value { color: var(--warn); }
 
   .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(560px, 1fr)); gap: 16px; }
   .panel { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
   .panel h2 { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
   .chart { width: 100%; height: 260px; }
+
+  .log { margin-top: 16px; }
+  #events { list-style: none; max-height: 260px; overflow-y: auto; }
+  #events li { display: flex; gap: 12px; padding: 8px 0; border-top: 1px solid var(--border);
+               font-size: 13px; align-items: baseline; }
+  #events li:first-child { border-top: none; }
+  #events .t { color: var(--muted); font-variant-numeric: tabular-nums; flex: none; width: 70px; }
+  #events .n { font-weight: 600; flex: none; width: 56px; }
+  #events li.bad .m { color: var(--bad); }
+  #events li.warn .m { color: var(--warn); }
+  #events li.ok .m { color: var(--ok); }
+  #events li.empty { color: var(--muted); }
 
   footer { color: var(--muted); font-size: 12px; margin-top: 24px; text-align: center; }
 
@@ -79,21 +99,21 @@
   </div>
 </header>
 
-<nav class="switcher" id="switcher"></nav>
+<nav class="fleet" id="fleet"></nav>
 
 <div id="alerts"></div>
 
 <section class="cards">
   <div class="card" id="card-temp"><div class="label">Temperature</div>
-    <div class="value"><span class="value-num">–</span><span class="unit">°C</span></div></div>
+    <div class="value"><span class="value-num">–</span><span class="unit">°C</span></div><div class="z"></div></div>
   <div class="card" id="card-humidity"><div class="label">Humidity</div>
-    <div class="value"><span class="value-num">–</span><span class="unit">% RH</span></div></div>
+    <div class="value"><span class="value-num">–</span><span class="unit">% RH</span></div><div class="z"></div></div>
   <div class="card" id="card-co"><div class="label">CO</div>
-    <div class="value"><span class="value-num">–</span></div></div>
+    <div class="value"><span class="value-num">–</span></div><div class="z"></div></div>
   <div class="card" id="card-smoke"><div class="label">Smoke</div>
-    <div class="value"><span class="value-num">–</span></div></div>
+    <div class="value"><span class="value-num">–</span></div><div class="z"></div></div>
   <div class="card" id="card-lpg"><div class="label">LPG</div>
-    <div class="value"><span class="value-num">–</span></div></div>
+    <div class="value"><span class="value-num">–</span></div><div class="z"></div></div>
   <div class="card" id="card-motion"><div class="label">Motion</div>
     <div class="value"><span class="value-num">–</span></div></div>
   <div class="card" id="card-light"><div class="label">Light</div>
@@ -107,10 +127,16 @@
   <div class="panel"><h2>Light &amp; Motion</h2><div class="chart" id="binChart"></div></div>
 </section>
 
+<section class="panel log">
+  <h2>Event log · all nodes</h2>
+  <ul id="events"></ul>
+</section>
+
 <footer>
   Last entry: <span id="lastEntry">–</span> ·
   Readings in view: <span id="count">–</span> ·
-  Refreshes every 15 s
+  Refreshes every 15 s ·
+  Anomaly rule: |z| ≥ <span id="zLimit"></span>
 </footer>
 
 <script>
@@ -119,15 +145,24 @@
   const NODES = [
     { name: "Node 1", id: 3518861, device: "b8:27:eb:bf:9d:51", note: "stable, warm" },
     { name: "Node 2", id: 3518882, device: "1c:bf:ce:15:ec:4d", note: "variable temp/humidity" },
-    { name: "Node 3", id: 3519225, device: "00:0f:00:70:91:0a", note: "stable, cooler" },
+    { name: "Node 3", id: null,    device: "00:0f:00:70:91:0a", note: "stable, cooler" },
   ];
 
-  const RESULTS = 60;            // how many recent readings to show
+  const RESULTS = 60;            // how many recent readings to fetch per node
   const REFRESH_MS = 15000;      // ThingSpeak only gets new data every ~16 s
   const STALE_AFTER_S = 60;      // no new data for this long = "stale"
 
-  // Demo alert thresholds — tweak these to whatever makes sense
-  const THRESHOLDS = { temp: 30, humidity: 75, co: 0.008, smoke: 0.028, lpg: 0.010 };
+  // Fixed safety limits (same for every node)
+  const THRESHOLDS = { temp: 30, humidity: 80, co: 0.008, smoke: 0.028, lpg: 0.010 };
+
+  // Anomaly detection: how far (in standard deviations) the latest reading may sit
+  // from this node's recent average before it counts as unusual.
+  const Z_LIMIT = 3;
+  const MIN_HISTORY = 10;        // readings needed before we trust the baseline
+  // Smallest spread we allow, so normal sensor jitter (e.g. 22.6 -> 22.7 °C) isn't flagged
+  const MIN_SD = { temp: 0.2, humidity: 0.5, co: 0.0002, smoke: 0.0005, lpg: 0.0002 };
+
+  const METRICS = ["temp", "humidity", "co", "smoke", "lpg"];
   const LABELS = { temp: "Temperature", humidity: "Humidity", co: "CO", smoke: "Smoke", lpg: "LPG" };
   const DECIMALS = { temp: 1, humidity: 1, co: 4, smoke: 4, lpg: 4 };
 
@@ -146,14 +181,31 @@
                        chartArea: { left: 60, right: 15, top: 35, bottom: 40 } };
 
   // ---------- state ----------
-  let current = 0;               // index into NODES
-  let latestRows = [];
+  let current = 0;                                   // which node is on screen
+  const data = NODES.map(() => ({ rows: [], error: null, analysis: null, prevStatus: null }));
+  const events = [];                                 // newest first
+  const seen = new Set();                            // so each alert is logged once
   const charts = {};
+  const fleetButtons = [];
+  let refreshing = false;
 
   // ---------- helpers ----------
   const el = id => document.getElementById(id);
   const num = v => { const n = parseFloat(v); return Number.isNaN(n) ? null : n; };
+  const fmt = (key, v) => v.toFixed(DECIMALS[key]);
   const chart = (id, Type) => charts[id] || (charts[id] = new Type(el(id)));
+  const timeStr = d => d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+
+  function fmtAge(s) {
+    if (s < 120) return `${s}s`;
+    if (s < 7200) return `${Math.round(s / 60)} min`;
+    return `${Math.round(s / 3600)} h`;
+  }
+
+  function setStatus(state, text) {
+    el("statusDot").className = "dot " + state;
+    el("statusText").textContent = text;
+  }
 
   function table(rows, cols) {
     const dt = new google.visualization.DataTable();
@@ -163,103 +215,222 @@
     return dt;
   }
 
-  function setStatus(state, text) {
-    el("statusDot").className = "dot " + state;
-    el("statusText").textContent = text;
-  }
-
-  // ---------- node switcher ----------
-  function buildSwitcher() {
-    const nav = el("switcher");
-    NODES.forEach((node, i) => {
-      const btn = document.createElement("button");
-      btn.textContent = node.name;
-      btn.disabled = node.id === null;
-      if (btn.disabled) btn.title = "Channel not set up yet";
-      btn.addEventListener("click", () => selectNode(i));
-      nav.appendChild(btn);
-    });
-  }
-
-  function selectNode(i) {
-    current = i;
-    const node = NODES[i];
-    [...el("switcher").children].forEach((b, j) => b.classList.toggle("active", j === i));
-    el("subtitle").textContent =
-      `${node.name} · device ${node.device} (${node.note}) · real Kaggle telemetry via ThingSpeak`;
-    location.hash = "node" + (i + 1);   // so you can link straight to a node
-
-    // clear the old node's data so nothing stale is shown while loading
-    latestRows = [];
-    document.querySelectorAll(".value-num").forEach(v => v.textContent = "–");
-    document.querySelectorAll(".card").forEach(c => c.classList.remove("alert"));
-    el("alerts").innerHTML = "";
-    Object.values(charts).forEach(c => c.clearChart());
-    setStatus("", "Connecting…");
-    refresh();
-  }
-
-  // ---------- fetch from ThingSpeak ----------
-  async function refresh() {
-    const nodeIndex = current;          // remember which node this request is for
-    const node = NODES[nodeIndex];
+  // ---------- fetch one node from ThingSpeak ----------
+  async function fetchNode(i) {
+    const d = data[i];
     try {
-      const res = await fetch(
-        `https://api.thingspeak.com/channels/${node.id}/feeds.json?results=${RESULTS}`);
+      const res = await fetch(`https://api.thingspeak.com/channels/${NODES[i].id}/feeds.json` +
+                              `?results=${RESULTS}&status=true`);
       if (!res.ok) throw new Error("HTTP " + res.status);
-      const data = await res.json();
-      if (nodeIndex !== current) return;  // user switched nodes while this was loading
-      if (!data.feeds) throw new Error("channel not public or wrong ID");
-
-      latestRows = data.feeds.map(f => ({
-        time: new Date(f.created_at),       // UTC -> local time automatically
+      const json = await res.json();
+      if (!json || !json.feeds) throw new Error("channel not public or wrong ID");
+      d.rows = json.feeds.map(f => ({
+        id: f.entry_id,
+        time: new Date(f.created_at),              // UTC -> local time automatically
         temp: num(f.field1), humidity: num(f.field2),
         co: num(f.field3), smoke: num(f.field4), lpg: num(f.field5),
         light: num(f.field6), motion: num(f.field7),
+        status: f.status || "",                    // "TEST SPIKE" for injected test readings
       }));
-
-      updateCards(latestRows);
-      draw(latestRows);
-      updateStatus(latestRows);
+      d.error = null;
     } catch (err) {
-      if (nodeIndex === current) setStatus("offline", "Offline: " + err.message);
+      d.error = err.message;
     }
   }
 
-  // ---------- status pill ----------
-  function updateStatus(rows) {
-    if (!rows.length) return setStatus("stale", "No data yet");
+  // ---------- anomaly detection ----------
+  // z-score: how many standard deviations the latest value is from the recent average
+  function zScore(history, value, minSd) {
+    const mean = history.reduce((a, b) => a + b, 0) / history.length;
+    const variance = history.reduce((a, b) => a + (b - mean) ** 2, 0) / history.length;
+    const sd = Math.max(Math.sqrt(variance), minSd);
+    return { mean, sd, z: (value - mean) / sd };
+  }
+
+  function analyze(i) {
+    const d = data[i];
+    if (d.error) return { status: "offline", error: d.error, checks: {} };
+    if (!d.rows.length) return { status: "nodata", checks: {} };
+
+    const rows = d.rows;
     const last = rows[rows.length - 1];
-    const ageS = Math.round((Date.now() - last.time) / 1000);
-    if (ageS > STALE_AFTER_S) setStatus("stale", `No new data for ${ageS}s`);
+    const ageS = Math.max(0, Math.round((Date.now() - last.time) / 1000));
+    const checks = {};
+
+    for (const key of METRICS) {
+      const value = last[key];
+      if (value === null) continue;
+      const c = { value, over: value > THRESHOLDS[key], z: null, anomaly: false };
+      // baseline = every reading in view except the latest one
+      const history = rows.slice(0, -1).map(r => r[key]).filter(v => v !== null);
+      if (history.length >= MIN_HISTORY) {
+        Object.assign(c, zScore(history, value, MIN_SD[key]));
+        c.anomaly = Math.abs(c.z) >= Z_LIMIT;
+      }
+      checks[key] = c;
+    }
+    return { status: ageS > STALE_AFTER_S ? "stale" : "live", ageS, last, checks,
+             test: /test/i.test(last.status) };
+  }
+
+  // ---------- event log ----------
+  function addEvent(type, node, msg, time = new Date()) {
+    events.unshift({ type, node, msg, time });
+    if (events.length > 30) events.length = 30;
+  }
+
+  function logOnce(key, type, node, msg, time) {
+    if (seen.has(key)) return;
+    seen.add(key);
+    addEvent(type, node, msg, time);
+  }
+
+  function logEvents(i, a) {
+    const node = NODES[i].name, d = data[i];
+
+    // status changes (skipped on first load, when there's no previous status)
+    if (d.prevStatus && d.prevStatus !== a.status) {
+      if (a.status === "stale") addEvent("warn", node, "stopped reporting (no data for over a minute)");
+      else if (a.status === "offline") addEvent("bad", node, "unreachable: " + a.error);
+      else if (a.status === "live") addEvent("ok", node, "back online");
+    }
+    d.prevStatus = a.status;
+
+    if (!a.last) return;
+    const tag = a.test ? " [test injection]" : "";
+    for (const [key, c] of Object.entries(a.checks)) {
+      if (c.over) {
+        logOnce(`${i}-${a.last.id}-${key}-over`, "bad", node,
+          `${LABELS[key]} ${fmt(key, c.value)} above limit ${THRESHOLDS[key]}${tag}`, a.last.time);
+      }
+      if (c.anomaly) {
+        logOnce(`${i}-${a.last.id}-${key}-z`, "warn", node,
+          `${LABELS[key]} unusual for this node: ${fmt(key, c.value)} (z = ${c.z.toFixed(1)})${tag}`, a.last.time);
+      }
+    }
+  }
+
+  function renderEvents() {
+    const ul = el("events");
+    ul.innerHTML = "";
+    if (!events.length) {
+      const li = document.createElement("li");
+      li.className = "empty";
+      li.textContent = "No events yet. Anomalies, limit breaches and nodes going offline will appear here.";
+      ul.appendChild(li);
+      return;
+    }
+    for (const e of events) {
+      const li = document.createElement("li");
+      li.className = e.type;
+      for (const [cls, text] of [["t", timeStr(e.time)], ["n", e.node], ["m", e.msg]]) {
+        const span = document.createElement("span");
+        span.className = cls;
+        span.textContent = text;
+        li.appendChild(span);
+      }
+      ul.appendChild(li);
+    }
+  }
+
+  // ---------- fleet (node status cards) ----------
+  const dotClass = s => ({ live: "live", stale: "stale", offline: "offline", nodata: "stale" }[s] || "");
+
+  function buildFleet() {
+    const nav = el("fleet");
+    NODES.forEach((node, i) => {
+      const btn = document.createElement("button");
+      btn.className = "node-btn";
+      btn.innerHTML = '<div class="top"><span class="dot"></span><span class="name"></span>' +
+                      '<span class="badge" hidden></span></div><div class="meta"></div>';
+      btn.querySelector(".name").textContent = node.name;
+      btn.querySelector(".meta").textContent = node.id === null ? "not set up yet" : "connecting…";
+      btn.disabled = node.id === null;
+      btn.addEventListener("click", () => selectNode(i));
+      nav.appendChild(btn);
+      fleetButtons.push(btn);
+    });
+  }
+
+  function renderFleet() {
+    NODES.forEach((node, i) => {
+      const btn = fleetButtons[i];
+      btn.classList.toggle("active", i === current);
+      const a = data[i].analysis;
+      if (node.id === null || !a) return;
+
+      btn.querySelector(".dot").className = "dot " + dotClass(a.status);
+      const meta = btn.querySelector(".meta");
+      if (a.status === "offline") meta.textContent = "offline";
+      else if (!a.last) meta.textContent = "no data yet";
+      else {
+        const t = a.checks.temp, h = a.checks.humidity;
+        meta.textContent = `${t ? fmt("temp", t.value) : "–"} °C · ${h ? fmt("humidity", h.value) : "–"} % RH` +
+                           (a.status === "stale" ? ` · silent ${fmtAge(a.ageS)}` : "");
+      }
+
+      const checks = Object.values(a.checks);
+      const badge = btn.querySelector(".badge");
+      if (checks.some(c => c.over)) { badge.hidden = false; badge.className = "badge alert"; badge.textContent = "limit"; }
+      else if (checks.some(c => c.anomaly)) { badge.hidden = false; badge.className = "badge anomaly"; badge.textContent = "unusual"; }
+      else badge.hidden = true;
+    });
+  }
+
+  // ---------- current node: cards, banners, charts ----------
+  function renderCurrent() {
+    const node = NODES[current];
+    const a = data[current].analysis;
+    el("subtitle").textContent =
+      `${node.name} · device ${node.device} (${node.note}) · real Kaggle telemetry via ThingSpeak`;
+
+    if (!a) { setStatus("", "Connecting…"); return; }
+    if (a.status === "offline") setStatus("offline", "Offline: " + a.error);
+    else if (a.status === "nodata") setStatus("stale", "No data yet");
+    else if (a.status === "stale") setStatus("stale", `No new data for ${fmtAge(a.ageS)}`);
     else setStatus("live", "Live");
-    el("lastEntry").textContent = last.time.toLocaleTimeString();
-    el("count").textContent = rows.length;
-  }
 
-  // ---------- current-value cards + alerts ----------
-  function updateCards(rows) {
-    if (!rows.length) return;
-    const last = rows[rows.length - 1];
-    const alerts = [];
-
-    for (const key of ["temp", "humidity", "co", "smoke", "lpg"]) {
-      const v = last[key];
+    // metric cards
+    const banners = [];
+    for (const key of METRICS) {
       const card = el("card-" + key);
-      card.querySelector(".value-num").textContent = v === null ? "–" : v.toFixed(DECIMALS[key]);
-      const over = v !== null && v > THRESHOLDS[key];
-      card.classList.toggle("alert", over);
-      if (over) alerts.push(`${LABELS[key]} above threshold: ${v.toFixed(DECIMALS[key])} > ${THRESHOLDS[key]}`);
+      const c = a.checks[key];
+      card.querySelector(".value-num").textContent = c ? fmt(key, c.value) : "–";
+      card.classList.toggle("alert", !!c && c.over);
+      card.classList.toggle("anomaly", !!c && c.anomaly && !c.over);
+
+      const zEl = card.querySelector(".z");
+      if (!c) zEl.textContent = "";
+      else if (c.z === null) zEl.textContent = "building baseline…";
+      else zEl.textContent = `z ${c.z >= 0 ? "+" : ""}${c.z.toFixed(1)} · typical ` +
+                             `${fmt(key, c.mean - 2 * c.sd)}–${fmt(key, c.mean + 2 * c.sd)}`;
+
+      const tag = a.test ? " [test injection]" : "";
+      if (c && c.over) banners.push(["alert",
+        `⚠ ${LABELS[key]} above limit: ${fmt(key, c.value)} > ${THRESHOLDS[key]}${tag}`]);
+      if (c && c.anomaly) banners.push(["anomaly",
+        `◆ ${LABELS[key]} unusual for this node: ${fmt(key, c.value)} (z = ${c.z.toFixed(1)}, ` +
+        `typical ${fmt(key, c.mean - 2 * c.sd)}–${fmt(key, c.mean + 2 * c.sd)})${tag}`]);
+    }
+    el("card-motion").querySelector(".value-num").textContent = a.last ? (a.last.motion ? "Detected" : "None") : "–";
+    el("card-light").querySelector(".value-num").textContent = a.last ? (a.last.light ? "On" : "Off") : "–";
+
+    const box = el("alerts");
+    box.innerHTML = "";
+    for (const [type, text] of banners) {
+      const div = document.createElement("div");
+      div.className = "banner " + type;
+      div.textContent = text;
+      box.appendChild(div);
     }
 
-    el("card-motion").querySelector(".value-num").textContent = last.motion ? "Detected" : "None";
-    el("card-light").querySelector(".value-num").textContent = last.light ? "On" : "Off";
-    el("alerts").innerHTML = alerts.map(a => `<div class="alert-banner">⚠ ${a}</div>`).join("");
+    draw(data[current].rows);
+    el("lastEntry").textContent = a.last ? a.last.time.toLocaleTimeString() : "–";
+    el("count").textContent = data[current].rows.length;
   }
 
-  // ---------- charts ----------
   function draw(rows) {
-    if (!rows.length) return;
+    if (!rows.length) { Object.values(charts).forEach(c => c.clearChart()); return; }
     const G = google.visualization;
 
     chart("tempChart", G.LineChart).draw(
@@ -282,15 +453,45 @@
         vAxis: vAxis({ viewWindow: { min: -0.1, max: 1.2 }, ticks: [0, 1] }) });
   }
 
+  // ---------- refresh loop: fetch every node, analyse, render ----------
+  async function refresh() {
+    if (refreshing) return;
+    refreshing = true;
+    try {
+      await Promise.all(NODES.map((n, i) => n.id === null ? null : fetchNode(i)));
+      NODES.forEach((n, i) => {
+        if (n.id === null) return;
+        data[i].analysis = analyze(i);
+        logEvents(i, data[i].analysis);
+      });
+      renderFleet();
+      renderCurrent();
+      renderEvents();
+    } finally {
+      refreshing = false;
+    }
+  }
+
+  function selectNode(i) {
+    current = i;
+    location.hash = "node" + (i + 1);   // so you can link straight to a node
+    renderFleet();
+    renderCurrent();
+  }
+
   // ---------- start ----------
   google.charts.load("current", { packages: ["corechart"] });
   google.charts.setOnLoadCallback(() => {
-    buildSwitcher();
-    // open the node from the URL (#node2) if given and set up, otherwise Node 1
+    el("zLimit").textContent = Z_LIMIT;
+    buildFleet();
+    renderEvents();
+    // open the node from the URL (#node2) if given and set up, otherwise the first set-up node
     const fromHash = parseInt((location.hash.match(/node(\d)/) || [])[1], 10) - 1;
-    selectNode(NODES[fromHash] && NODES[fromHash].id !== null ? fromHash : 0);
+    const firstReady = NODES.findIndex(n => n.id !== null);
+    selectNode(NODES[fromHash] && NODES[fromHash].id !== null ? fromHash : Math.max(firstReady, 0));
+    refresh();
     setInterval(refresh, REFRESH_MS);
-    window.addEventListener("resize", () => draw(latestRows));
+    window.addEventListener("resize", () => draw(data[current].rows));
   });
 </script>
 </body>
