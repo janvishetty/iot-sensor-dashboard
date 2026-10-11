@@ -71,7 +71,7 @@
   #events li { display: flex; gap: 12px; padding: 8px 0; border-top: 1px solid var(--border);
                font-size: 13px; align-items: baseline; }
   #events li:first-child { border-top: none; }
-  #events .t { color: var(--muted); font-variant-numeric: tabular-nums; flex: none; width: 70px; }
+  #events .t { color: var(--muted); font-variant-numeric: tabular-nums; flex: none; width: 96px; white-space: nowrap; }
   #events .n { font-weight: 600; flex: none; width: 56px; }
   #events li.bad .m { color: var(--bad); }
   #events li.warn .m { color: var(--warn); }
@@ -145,12 +145,13 @@
   const NODES = [
     { name: "Node 1", id: 3518861, device: "b8:27:eb:bf:9d:51", note: "stable, warm" },
     { name: "Node 2", id: 3518882, device: "1c:bf:ce:15:ec:4d", note: "variable temp/humidity" },
-    { name: "Node 3", id: null,    device: "00:0f:00:70:91:0a", note: "stable, cooler" },
+    { name: "Node 3", id: 3519225, device: "00:0f:00:70:91:0a", note: "stable, cooler" },
   ];
 
   const RESULTS = 60;            // how many recent readings to fetch per node
   const REFRESH_MS = 15000;      // ThingSpeak only gets new data every ~16 s
   const STALE_AFTER_S = 60;      // no new data for this long = "stale"
+  const GAP_MS = 5 * 60 * 1000;  // a pause longer than this = a new replay run
 
   // Fixed safety limits (same for every node)
   const THRESHOLDS = { temp: 30, humidity: 80, co: 0.008, smoke: 0.028, lpg: 0.010 };
@@ -224,7 +225,7 @@
       if (!res.ok) throw new Error("HTTP " + res.status);
       const json = await res.json();
       if (!json || !json.feeds) throw new Error("channel not public or wrong ID");
-      d.rows = json.feeds.map(f => ({
+      const rows = json.feeds.map(f => ({
         id: f.entry_id,
         time: new Date(f.created_at),              // UTC -> local time automatically
         temp: num(f.field1), humidity: num(f.field2),
@@ -232,6 +233,14 @@
         light: num(f.field6), motion: num(f.field7),
         status: f.status || "",                    // "TEST SPIKE" for injected test readings
       }));
+      // Keep only the latest unbroken run of readings. If replay.py was stopped and
+      // restarted, readings from the previous run would stretch the charts across days
+      // and mix two different stretches of data into the anomaly baseline.
+      let start = 0;
+      for (let k = rows.length - 1; k > 0; k--) {
+        if (rows[k].time - rows[k - 1].time > GAP_MS) { start = k; break; }
+      }
+      d.rows = rows.slice(start);
       d.error = null;
     } catch (err) {
       d.error = err.message;

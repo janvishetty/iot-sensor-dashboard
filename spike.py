@@ -15,7 +15,7 @@ import requests
 CHANNELS = {
     1: (3518861, "TS_WRITE_KEY"),
     2: (3518882, "TS_WRITE_KEY_2"),
-    3: (None, "TS_WRITE_KEY_3"),      # put Node 3's channel ID here
+    3: (3519225, "TS_WRITE_KEY_3"),
 }
 GAS_FIELDS = ("field3", "field4", "field5")   # co, smoke, lpg
 DEFAULT_FACTOR = 1.25   # small leak: under the fixed limits, but unusual for the node
